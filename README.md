@@ -33,4 +33,18 @@ write will use the offset of the first write.
 
 ### Pipes
 
-Todo
+calling the system call `pipe(p)` on an `int p[2]` and then calling `fork()` allows the parent and
+child process to communicate with eachother. One process can write to `p[1]` and
+the other can read from `p[0]`. The read to `p[0]` blocks until data is written
+on the write side or all file descriptors referring to the write side object
+are closed.
+
+Advantage of pipe is that it removes the need for intermediate files. Processes can 
+theoretically transfer and process large amounts of data in an online fashion, without 
+having to allocate space for all the data. Also some concurrency can be achieved by
+having the read and write process work independently (think about the consumer producer problem).
+
+
+### Files, File system, inodes
+
+TODO. Not too important i think for my purposes.
