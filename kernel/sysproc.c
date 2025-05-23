@@ -91,3 +91,13 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_trace(void)
+{
+  int flags;
+  argint(0, &flags);
+  // I don't think I need a lock here, when would one process want another process' tracing flags?
+  myproc()->tracing_flags = flags;
+  return 0;
+}

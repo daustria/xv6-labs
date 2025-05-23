@@ -250,6 +250,7 @@ userinit(void)
   p->cwd = namei("/");
 
   p->state = RUNNABLE;
+  p->tracing_flags = 0;
 
   release(&p->lock);
 }
@@ -301,6 +302,9 @@ fork(void)
 
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
+
+  // Copy trace mask of parent to child.
+  np->tracing_flags = p->tracing_flags;
 
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)
