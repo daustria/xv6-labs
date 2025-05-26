@@ -1,46 +1,109 @@
-xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
-Version 6 (v6).  xv6 loosely follows the structure and style of v6,
-but is implemented for a modern RISC-V multiprocessor using ANSI C.
+ASSEMBLY
 
-ACKNOWLEDGMENTS
+The text for this opertaing system uses some ideas from assembly.
 
-xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
-to Peer Communications; ISBN: 1-57398-013-7; 1st edition (June 14,
-2000)).  See also https://pdos.csail.mit.edu/6.1810/, which provides
-pointers to on-line resources for v6.
+Assembly instructions are for the cpu to run 'directly' with the fetch execute cycle.
+They are stored directly in RAM. The fetch execute cycle can be described as an infinite loop
+with the following iteration:
 
-The following people have made contributions: Russ Cox (context switching,
-locking), Cliff Frey (MP), Xiao Yu (MP), Nickolai Zeldovich, and Austin
-Clements.
+1. Lookup the instruction at index PC (program counter) in RAM (initially set to 0).
+2. Interpret this instruction, and execute it.
+3. Move PC up by 4.
 
-We are also grateful for the bug reports and patches contributed by
-Takahiro Aoyagi, Marcelo Arroyo, Silas Boyd-Wickizer, Anton Burtsev,
-carlclone, Ian Chen, Dan Cross, Cody Cutler, Mike CAT, Tej Chajed,
-Asami Doi,Wenyang Duan, eyalz800, Nelson Elhage, Saar Ettinger, Alice
-Ferrazzi, Nathaniel Filardo, flespark, Peter Froehlich, Yakir Goaron,
-Shivam Handa, Matt Harvey, Bryan Henry, jaichenhengjie, Jim Huang,
-Matúš Jókay, John Jolly, Alexander Kapshuk, Anders Kaseorg, kehao95,
-Wolfgang Keller, Jungwoo Kim, Jonathan Kimmitt, Eddie Kohler, Vadim
-Kolontsov, Austin Liew, l0stman, Pavan Maddamsetti, Imbar Marinescu,
-Yandong Mao, Matan Shabtay, Hitoshi Mitake, Carmi Merimovich, Mark
-Morrissey, mtasm, Joel Nider, Hayato Ohhashi, OptimisticSide,
-phosphagos, Harry Porter, Greg Price, RayAndrew, Jude Rich, segfault,
-Ayan Shafqat, Eldar Sehayek, Yongming Shen, Fumiya Shigemitsu, snoire,
-Taojie, Cam Tenny, tyfkda, Warren Toomey, Stephen Tu, Alissa Tung,
-Rafael Ubal, Amane Uehara, Pablo Ventura, Xi Wang, WaheedHafez,
-Keiichi Watanabe, Lucas Wolf, Nicolas Wolovick, wxdao, Grant Wu, x653,
-Jindong Zhang, Icenowy Zheng, ZhUyU1997, and Zou Chang Wei.
+Certain instruction break the loop or move the PC elsewhere.
 
-ERROR REPORTS
+These instructions are usually pretty simple. The cpu can load values into registers from RAM,
+add and multiply numbers from registers. There are also instructions to load a value from RAM, or put
+a value into RAM.
 
-Please send errors and suggestions to Frans Kaashoek and Robert Morris
-(kaashoek,rtm@mit.edu).  The main purpose of xv6 is as a teaching
-operating system for MIT's 6.1810, so we are more interested in
-simplifications and clarifications than new features.
+C programs can be compiled into assembly code, and assembly can be compiled into machine code.
+The latter is easier, there is a standardized way to do it depending on your machine architecture. The former
+has a lot more variation.
 
-BUILDING AND RUNNING XV6
+XV6 BOOTUP
 
-You will need a RISC-V "newlib" tool chain from
-https://github.com/riscv/riscv-gnu-toolchain, and qemu compiled for
-riscv64-softmmu.  Once they are installed, and in your shell
-search path, you can run "make qemu".
+We give an overview for the bootup process of xv6. This will be vague, more detail will be provided
+when we study different parts of the OS further.
+
+- riscv-computer turns on and initializes (perhaps turning on all devices in the computer).
+
+- runs a boot loader program, stored in read-only memory (where might this be stored?)
+
+- the boot loader program loads xv6 into RAM presumably. specifically at physical address 0x800000 because
+the lower addresses are reserved for the simulated hardware.
+
+-when xv6 first runs, we make a user stack so that we can run C programs.
+Q: is xv6 completely a C program at this point? are we not already a C program?
+I need to get a better handle of what running C programs mean. 
+
+- kernel/start.c runs. some more initialization is done here, in particular ones that can be done only 
+in machine mode, then we switch to supervisor mode.
+
+-writes main's address into register $mepc
+
+-disable virtual address translation, writing 0 into page-table register $satp
+
+-makes it so that interruptions, exceptions run in supervisor mode ?
+
+-programs clock chip to generate timer interrupts
+
+- Now user programs are ready to run. We call userinit in kernel/proc.c, the first
+process. This program calls the system call exec, transforming
+the current program into the /init process, the first user level program. This
+does some initialization some initialization (console device file? open file descriptors?),
+followed by a call to exec to run the shell program user/sh.c . The system is up.
+
+XV6 SYSTEM CALLS
+
+How does a user program make a system call?
+
+Into the shell we type 'trace 32 grep hello README'. This
+runs the user program described by user/trace.c. 
+
+We call the user level system call trace with the first of these arguments, 32 in this case.
+This turns on a flag corresponding to what statements get traced or printed. After 
+setting this flag, we call exec with 'grep hello README'. The statements corresponding to the
+flag we set with trace() are printed in the console.
+
+The 'trace()' function that gets called is in user/user.h. It's implementation is different from usual,
+it is in usys.S, which gets generated by the Pearl script usys.pl. It is in assmebly, and has the form:
+
+.global trace
+trace:
+    li a7, SYS_trace
+    ecall
+    ret
+
+The first line basically makes the 'trace' program accessible from any program that was built with usys.S. We see
+that the trace program is only 3 lines of assembly. and here is my guess on what it does.
+
+Into the register a7, we load the system call number for SYS_trace. This macro is defined somewhere in the kernel code.
+We jump into the kernel in supervisor mode (trap?) with the intention to perform this system call. This is the usual routine for invoking system calls (what are some details about this process?). 
+In this particular case we run the function uint64_t sys_trace(int). `ret` signifies the end of the program. 
+
+The 'sys_' version of the system call is the version that runs in kernel mode. The system call name without
+the sys is the one the user calls, which is a 3 line assembly program that loads the system call number and invokes
+ecall.
+
+All other system calls are implemented similarly.
+
+Question: In the body of the sys_ version of a system call, how do we get the arguments? It seems that
+the kernel implementatiosn for system calls expect it to be in
+p->trapframe->a0, a1, a2, a3, a4, a5.
+
+Where in the code, and along the system call routine, do they put the system call arguments in these registers?
+
+
+XV6 TRACING
+
+We would like to make it so that for an individual run of a user program that the user chooses, a select number of system 
+calls print to the console before finishing. Here is one way to do this.
+
+
+-Use the proc structure of the child process made when running the user program.Add a new variable to the proc structure called tracing_flags
+-This variable is 0 most of the time. The only way to set it is with a call to sys_trace(), which should set the calling process' tracing_flags accordingly.
+-When the program that called trace runs execv to transform itself into the user program,it will have the same tracing flags.
+-When the user program or any of its children calls sys_fork, make sure to copy to the child process our tracing flags. So that the new process has tracing on.
+
+
+This is a nice implementation since only the specified user program and its descendants have tracing. It did not require modifying the kernel too much. A messier way to do this might, for example, set a global tracing variable in the kernel and rewrite every other system call.
