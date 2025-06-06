@@ -17,8 +17,11 @@ add and multiply numbers from registers. There are also instructions to load a v
 a value into RAM.
 
 C programs can be compiled into assembly code, and assembly can be compiled into machine code.
-The latter is easier, there is a standardized way to do it depending on your machine architecture. The former
-has a lot more variation.
+It's interesting that even the most complicated C and C++ programs translate to a sequence of
+instructions, each one being very simple.
+
+Going from assembly to machine/binary is easier, there is a standardized way to do it depending on your machine architecture. 
+The former has a lot more variation.
 
 XV6 BOOTUP
 
@@ -105,5 +108,19 @@ calls print to the console before finishing. Here is one way to do this.
 -When the program that called trace runs execv to transform itself into the user program,it will have the same tracing flags.
 -When the user program or any of its children calls sys_fork, make sure to copy to the child process our tracing flags. So that the new process has tracing on.
 
-
 This is a nice implementation since only the specified user program and its descendants have tracing. It did not require modifying the kernel too much. A messier way to do this might, for example, set a global tracing variable in the kernel and rewrite every other system call.
+
+ATTACK XV6
+
+In this portion of the lab, secret.c writes a string to an arbitrary location in its memory. This portion of the lab asks us to
+recover this secret. We assume that the string is 8 bytes or less, including the null character. To recover this secret, in attack.c
+we immediately ask for about 32 pages of memory using the sbrk system call, and then print the first 100 bytes or so, so that the user
+can manually look for the secret.
+
+If we run attack.c immediately after secret.c, we will see that the secret is always in the same spot, because xv6 distributes pages
+in a deterministic manner. So attack.c just returns the 8 byte string in the location we previously determined the secret to be in.
+
+Note that this attack does not work when we run attacktest, probably because the allocation of attacktest changes how pages are distributed,
+causing the secret to be in a different location. But I don't want to spend too much time on this portion of the lab, I already have the
+basic idea and I want to learn other things about operatin systems.
+
